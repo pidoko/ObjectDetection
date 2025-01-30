@@ -1,31 +1,51 @@
 import cv2
-import matplotlib.pyplot as plt
+import argparse
 
 face_classifier = cv2.CascadeClassifier(
     cv2.data.haarcascades + "haarcascade_frontalface_default.xml"
 )
 
-video_capture = cv2.VideoCapture(0)
+if face_classifier.empty():
+    raise RuntimeError("Error loading Haar cascade classifier")
 
-def detect_bounding_box(vid):
-    gray_image = cv2.cvtColor(vid, cv2.COLOR_BGR2GRAY)
-    faces = face_classifier.detectMultiScale(gray_image, 1.1, 5, minSize=(40, 40))
+def detect_faces(frame):
+    """Detects faces in the given frame and draws bounding boxes."""
+    gray_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+    faces = face_classifier.detectMultiScale(gray_frame, 1.1, 5, minSize=(40, 40))
+
     for (x, y, w, h) in faces:
-        cv2.rectangle(vid, (x, y), (x + w, y + h), (0, 255, 0), 4)
+        cv2.rectangle(frame, (x, y), (x + w, y + h), (0, 255, 0), 4)
+
     return faces
 
-while True:
-    result, video_frame = video_capture.read() 
-    if result is False:
-        print(f"Video could not be read\n")
-        break
+def main(video_source=0):
+    """Main function to start video capture and face detection."""
+    video_capture = cv2.VideoCapture(video_source)
 
-    faces = detect_bounding_box(video_frame)
+    if not video_capture.isOpened():
+        print("Error: Could not open video source.")
+        return
 
-    cv2.imshow('My Face Detection Project', video_frame)
+    print("Press 'q' to exit the program")
 
-    if cv2.waitKey(1) & 0xFF == ord('q'):
-        break
+    while True:
+        success, frame = video_capture.read() 
+        if not success:
+            print(f"Error: Failed to read frame.\n")
+            break
 
-video_capture.release()
-cv2.destroyAllWindows()
+        detect_faces(frame)
+        cv2.imshow('Face Detector', frame)
+
+        if cv2.waitKey(1) & 0xFF == ord('q'):
+            break
+
+    video_capture.release()
+    cv2.destroyAllWindows()
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Face detection in video stream.")
+    parser.add_argument("--source", type=int, default=0, help="Video source (default: 0 for webcam)")
+    args = parser.parse_args()
+    
+    main(args.source)
