@@ -5,14 +5,10 @@ imagePath = 'input_image.jpg'
 
 img = cv2.imread(imagePath)
 
-print(f"Shape properties of img: {img.shape}\n")
-
 gray_image = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
 
-print(f"Shape properties of gray_image: {gray_image.shape}\n")
-
 face_classifier = cv2.CascadeClassifier(
-    cv2.data.haarcascades + "haarcascade_frontalfae_default.xml"
+    cv2.data.haarcascades + "haarcascade_frontalface_default.xml"
 )
 
 face = face_classifier.detectMultiScale(
