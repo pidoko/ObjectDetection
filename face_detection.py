@@ -2,74 +2,151 @@ import cv2
 import argparse
 import gradio as gr
 import numpy as np
+import logging
 
-# Load the Haar cascade for face detection
-face_classifier = cv2.CascadeClassifier(
-    cv2.data.haarcascades + "haarcascade_frontalface_default.xml"
-)
+# Configure logging for production-level traceability
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
+# Constants
+FACE_CASCADE_PATH: str = cv2.data.haarcascades + "haarcascade_frontalface_default.xml"
+
+# Initialize the Haar cascade for face detection
+face_classifier = cv2.CascadeClassifier(FACE_CASCADE_PATH)
 if face_classifier.empty():
-    raise RuntimeError("Error loading Haar cascade classifier")
+    raise RuntimeError(f"Error loading Haar cascade classifier from {FACE_CASCADE_PATH}")
 
-def detect_faces(frame):
-    """Detects faces in the given frame and draws bounding boxes."""
+def detect_faces(frame: np.ndarray) -> np.ndarray:
+    """
+    Detect faces in the given image frame and draw bounding boxes around them.
+    
+    The image is converted to grayscale for detection using Haar cascades, and 
+    then the bounding boxes are drawn on the original color frame.
+    
+    Args:
+        frame (np.ndarray): Input image in BGR color space.
+        
+    Returns:
+        np.ndarray: The image with detected face bounding boxes drawn.
+    """
+    # Convert the input frame to grayscale as required by the face detector
     gray_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-    faces = face_classifier.detectMultiScale(gray_frame, 1.1, 5, minSize=(40, 40))
-
+    
+    # Detect faces with specified parameters (scaleFactor, minNeighbors, and minSize)
+    faces = face_classifier.detectMultiScale(
+        gray_frame, 
+        scaleFactor=1.1, 
+        minNeighbors=5, 
+        minSize=(40, 40)
+    )
+    
+    # Draw bounding boxes around each detected face
     for (x, y, w, h) in faces:
         cv2.rectangle(frame, (x, y), (x + w, y + h), (0, 255, 0), 4)
+    
+    return frame
 
-    return faces
+def process_video(frame: np.ndarray) -> np.ndarray:
+    """
+    Process a single video frame for face detection, designed for use with Gradio.
+    
+    This function converts the frame from RGB (as provided by Gradio) to BGR for
+    OpenCV processing, applies face detection, and then converts the frame back to RGB.
+    
+    Args:
+        frame (np.ndarray): Input video frame in RGB color space.
+        
+    Returns:
+        np.ndarray: Processed video frame with face detection annotations in RGB color space.
+    """
+    # Convert from RGB to BGR for compatibility with OpenCV
+    bgr_frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
+    
+    # Perform face detection and annotation
+    processed_frame = detect_faces(bgr_frame)
+    
+    # Convert the processed frame back to RGB for display in Gradio
+    return cv2.cvtColor(processed_frame, cv2.COLOR_BGR2RGB)
 
-def process_video(frame):
-    """Processes incoming video frames for face detection in Gradio."""
-    frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)  # Convert from RGB to BGR for OpenCV
-    frame = detect_faces(frame)
-    return cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)  # Convert back to RGB for display
-
-def launch_gradio(source):
-    """Launches the Gradio interface for face detection."""
+def launch_gradio(source: int = 0) -> None:
+    """
+    Launch a Gradio web interface for real-time face detection.
+    
+    This function sets up the Gradio interface using the `process_video` function as
+    the processing endpoint. The interface is configured to stream video from the specified source.
+    
+    Args:
+        source (int): Video source index (default is 0 for the primary webcam).
+    """
     iface = gr.Interface(
-        fn=process_video, 
-        inputs=gr.Video(source, streaming=True),
+        fn=process_video,
+        inputs=gr.Video(source=source, streaming=True),
         outputs=gr.Image(type="numpy"),
-        live=True
+        live=True,
+        title="Real-Time Face Detection",
+        description="This application detects faces in real-time using Haar cascades."
     )
-    iface.launch(share=True) # Enables public link
+    
+    # Launch the Gradio interface with a public sharing link enabled
+    iface.launch(share=True)
 
-def main(video_source):
-    """Main function to start video capture and face detection."""
+def main(video_source: int = 0) -> None:
+    """
+    Capture video from a specified source and perform real-time face detection.
+    
+    This function uses OpenCV to capture video frames, applies face detection on each frame,
+    and displays the annotated frames. The video stream can be terminated by pressing 'q'.
+    
+    Args:
+        video_source (int): Video source index (default is 0 for the primary webcam).
+    """
     video_capture = cv2.VideoCapture(video_source)
 
     if not video_capture.isOpened():
-        print("Error: Could not open video source.")
+        logging.error("Error: Could not open video source %s", video_source)
         return
 
-    print("Press 'q' to exit the program")
+    logging.info("Starting video stream. Press 'q' to exit.")
 
     while True:
-        success, frame = video_capture.read() 
+        success, frame = video_capture.read()
         if not success:
-            print(f"Error: Failed to read frame.\n")
+            logging.error("Error: Failed to read frame from video source.")
             break
 
-        detect_faces(frame)
-        cv2.imshow('Face Detector', frame)
+        # Process the frame to detect and annotate faces
+        processed_frame = detect_faces(frame)
+        
+        # Display the processed frame in a window
+        cv2.imshow('Face Detector', processed_frame)
 
+        # Exit the loop when 'q' is pressed
         if cv2.waitKey(1) & 0xFF == ord('q'):
+            logging.info("Exit command received. Closing video stream.")
             break
 
+    # Release resources and close windows
     video_capture.release()
     cv2.destroyAllWindows()
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Face detection in video stream.")
-    parser.add_argument("--source", type=int, default=1, help="Video source (default: 0 for webcam)")
-    parser.add_argument("--gradio", action="store_true", help="Run face detection as a Gradio web app")
+    parser = argparse.ArgumentParser(
+        description="Face detection in a video stream using Haar cascades."
+    )
+    parser.add_argument(
+        "--source",
+        type=int,
+        default=0,
+        help="Video source index (default: 0 for the primary webcam)"
+    )
+    parser.add_argument(
+        "--gradio",
+        action="store_true",
+        help="Run face detection as a Gradio web app"
+    )
     
     args = parser.parse_args()
 
     if args.gradio:
-        launch_gradio(source=0)
+        launch_gradio(source=args.source)
     else:
-        main(args.source)
+        main(video_source=args.source)
