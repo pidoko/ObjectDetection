@@ -27,7 +27,7 @@ def process_video(frame):
     frame = detect_faces(frame)
     return cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)  # Convert back to RGB for display
 
-def launch_gradio(source=0):
+def launch_gradio(source):
     """Launches the Gradio interface for face detection."""
     iface = gr.Interface(
         fn=process_video, 
@@ -37,7 +37,7 @@ def launch_gradio(source=0):
     )
     iface.launch(share=True) # Enables public link
 
-def main(video_source=0):
+def main(video_source):
     """Main function to start video capture and face detection."""
     video_capture = cv2.VideoCapture(video_source)
 
@@ -64,12 +64,12 @@ def main(video_source=0):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Face detection in video stream.")
-    parser.add_argument("--source", type=int, default=0, help="Video source (default: 0 for webcam)")
+    parser.add_argument("--source", type=int, default=1, help="Video source (default: 0 for webcam)")
     parser.add_argument("--gradio", action="store_true", help="Run face detection as a Gradio web app")
     
     args = parser.parse_args()
 
     if args.gradio:
-        launch_gradio(0)
+        launch_gradio(source=0)
     else:
         main(args.source)
