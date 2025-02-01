@@ -5,7 +5,8 @@ import numpy as np
 import logging
 
 # Configure logging for production-level traceability
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logging.basicConfig(
+    filename="app_log.log", level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 # Constants
 FACE_CASCADE_PATH: str = cv2.data.haarcascades + "haarcascade_frontalface_default.xml"
