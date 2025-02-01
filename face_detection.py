@@ -137,7 +137,7 @@ def main(video_source: int = 0) -> None:
         cv2.imshow('Face Detector', processed_frame)
 
         # Exit the loop when 's' is pressed
-        if cv2.waitKey(1) & 0xFF == ord('s'):
+        if cv2.waitKey(1) & 0xFF == ord('q'):
             logging.info("Exit command received. Closing video stream.")
             break
 
