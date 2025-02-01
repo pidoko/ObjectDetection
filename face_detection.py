@@ -3,10 +3,28 @@ import argparse
 import gradio as gr
 import numpy as np
 import logging
+from pythonjsonlogger import jsonlogger
 
-# Configure logging for production-level traceability
-logging.basicConfig(
-    filename="app_log.log", level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+# Create log handlers
+file_handler = logging.FileHandler("app_log.json")
+console_handler = logging.StreamHandler()
+
+# Set log levels
+file_handler.setLevel(logging.INFO)
+console_handler.setLevel(logging.INFO)
+
+# Define JSON formatter
+formatter = jsonlogger.JsonFormatter('%(asctime)s %(levelname)s %(message)s %(name)s')
+
+# Apply formatter to handlers
+file_handler.setFormatter(formatter)
+console_handler.setFormatter(formatter)
+
+# Get logger and attach handlers
+logger = logging.getLogger()
+logger.setLevel(logging.INFO)
+logger.addHandler(file_handler)
+logger.addHandler(console_handler)
 
 # Constants
 FACE_CASCADE_PATH: str = cv2.data.haarcascades + "haarcascade_frontalface_default.xml"
