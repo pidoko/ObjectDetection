@@ -48,24 +48,39 @@ def detect_faces(frame: np.ndarray) -> np.ndarray:
 def process_video(frame: np.ndarray) -> np.ndarray:
     """
     Process a single video frame for face detection, designed for use with Gradio.
-    
-    This function converts the frame from RGB (as provided by Gradio) to BGR for
-    OpenCV processing, applies face detection, and then converts the frame back to RGB.
-    
+
+    Converts the frame from RGB (as provided by Gradio) to BGR for OpenCV processing, 
+    applies face detection, and then converts the frame back to RGB.
+
     Args:
         frame (np.ndarray): Input video frame in RGB color space.
-        
+
     Returns:
         np.ndarray: Processed video frame with face detection annotations in RGB color space.
+                    If the input frame is empty or None, returns the frame unchanged.
     """
-    # Convert from RGB to BGR for compatibility with OpenCV
-    bgr_frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
-    
-    # Perform face detection and annotation
+    # Check if the frame is empty
+    if frame is None or frame.size == 0:
+        logging.warning("Received an empty frame from Gradio. Skipping processing.")
+        return frame
+
+    try:
+        # Convert from RGB to BGR for OpenCV compatibility
+        bgr_frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
+    except cv2.error as e:
+        logging.error("Error converting frame from RGB to BGR: %s", e)
+        return frame
+
     processed_frame = detect_faces(bgr_frame)
-    
-    # Convert the processed frame back to RGB for display in Gradio
-    return cv2.cvtColor(processed_frame, cv2.COLOR_BGR2RGB)
+
+    try:
+        # Convert the processed frame back to RGB for Gradio
+        rgb_frame = cv2.cvtColor(processed_frame, cv2.COLOR_BGR2RGB)
+    except cv2.error as e:
+        logging.error("Error converting processed frame from BGR to RGB: %s", e)
+        return processed_frame
+
+    return rgb_frame
 
 def launch_gradio(source: int = 0) -> None:
     """
@@ -79,7 +94,7 @@ def launch_gradio(source: int = 0) -> None:
     """
     iface = gr.Interface(
         fn=process_video,
-        inputs=gr.Video(source=source, streaming=True),
+        inputs=gr.Video(source, streaming=True),
         outputs=gr.Image(type="numpy"),
         live=True,
         title="Real-Time Face Detection",
@@ -94,7 +109,7 @@ def main(video_source: int = 0) -> None:
     Capture video from a specified source and perform real-time face detection.
     
     This function uses OpenCV to capture video frames, applies face detection on each frame,
-    and displays the annotated frames. The video stream can be terminated by pressing 'q'.
+    and displays the annotated frames. The video stream can be terminated by pressing 's'.
     
     Args:
         video_source (int): Video source index (default is 0 for the primary webcam).
@@ -105,28 +120,31 @@ def main(video_source: int = 0) -> None:
         logging.error("Error: Could not open video source %s", video_source)
         return
 
-    logging.info("Starting video stream. Press 'q' to exit.")
+    logging.info("Starting video stream. Press 's' to exit.")
 
     while True:
         success, frame = video_capture.read()
-        if not success:
-            logging.error("Error: Failed to read frame from video source.")
-            break
 
+        # Handle empty frames by continuing the loop instead of breaking
+        if not success or frame is None or frame.size == 0:
+            logging.warning("Received an empty frame. Waiting for valid frames...")
+            continue  # Keep waiting for valid frames
+        
         # Process the frame to detect and annotate faces
         processed_frame = detect_faces(frame)
         
         # Display the processed frame in a window
         cv2.imshow('Face Detector', processed_frame)
 
-        # Exit the loop when 'q' is pressed
-        if cv2.waitKey(1) & 0xFF == ord('q'):
+        # Exit the loop when 's' is pressed
+        if cv2.waitKey(1) & 0xFF == ord('s'):
             logging.info("Exit command received. Closing video stream.")
             break
 
     # Release resources and close windows
     video_capture.release()
     cv2.destroyAllWindows()
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
